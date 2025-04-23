@@ -11,6 +11,16 @@ VIDEO2_PATH = 'samples/video2.mp4'
 tracker = Sort(max_age=10, min_hits=3)
 vehicle_ids = set()
 
+#Variáveis para contagem de carros
+# Variáveis para detectar a passagem de carros da linha
+prev_centroids = {}     # id → y do frame anterior
+counted_ids    = set()  # ids já contados
+total_count    = 0
+
+# Variáveis de frameskip
+frame_skip   = 10        # ⇒ processa 1 de cada 3 quadros
+frame_index  = 0        # contador global
+
 def draw_boxes (x, y, h, w, frame, class_name, obj_id=None):
     #Desenha a bounding box
     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -96,11 +106,12 @@ def frame_generator(input_path):
 # Carregar modelo
 classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4-csp-swish.weights')
 
-frame_skip = 1
-frame_count = 0
+for frame in frame_generator(VIDEO1_PATH):
 
-for frame in frame_generator(DAIR_V2X_PATH):
-    if frame_count % frame_skip == 0:
+    # Definindo a linha horizontal
+    line_y = int(frame.shape[0] * 0.55)   # 65 % da altura
+
+    if frame_index % frame_skip == 0:
         detections = detect_vehicles(frame)
         tracks = tracker.update(detections)
         
@@ -109,9 +120,30 @@ for frame in frame_generator(DAIR_V2X_PATH):
             w = int(x2 - x1)
             h = int(y2 - y1)
             draw_boxes(int(x1), int(y1), w, h, frame, "vehicle",  track_id)
-            
-        cv2.imshow("Detecção com Tracking", frame)
-    frame_count += 1
+
+            #checando se passou da linha
+            center_y = (y1+y2)//2 #centro atual
+            prev_center = prev_centroids.get(track_id) #centros anteriores
+            if prev_center is not None:
+                # Exemplo: conta quando vem de cima (prev < line) e passa para baixo (cy ≥ line)
+                if (prev_center < line_y) and (center_y>=line_y):     #Se o anterior estava antes do treshold e o atual depois, cruzou a linha
+                    if track_id not in counted_ids:    
+                        total_count += 1
+                        counted_ids.add(track_id)
+                        print(f"Veículo {track_id} contado! Total = {total_count}")
+
+
+            #Atualiza a posição do centro
+            prev_centroids[track_id] = center_y
+
+    #printa a linha
+    cv2.line(frame, (0, line_y), (frame.shape[1], line_y), (255, 0, 0), 2)
+    cv2.putText(frame, f"Count: {total_count}", (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
+
+        
+    cv2.imshow("Detecção com Tracking", frame)
+
     if cv2.waitKey(1) & 0xFF == 27:
         break
 
