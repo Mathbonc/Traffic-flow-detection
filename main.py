@@ -6,6 +6,9 @@ from sort import Sort
 DAIR_V2X_PATH = 'samples/DAIR-V2X-C/*.jpg'
 VIDEO1_PATH = 'samples/video1.mp4'
 VIDEO2_PATH = 'samples/video2.mp4'
+VIDEO3_PATH = 'samples/video3.mp4'
+VIDEO4_PATH = 'samples/video4.mp4'
+VIDEO5_PATH = 'samples/video5.mp4'
 
 # Inicializa o SORT
 tracker = Sort(max_age=30, min_hits=3, iou_threshold=0.3)
@@ -103,11 +106,29 @@ def frame_generator(input_path):
     else:
         raise ValueError("Formato de entrada não suportado.")
 
+def detect_light(frame, roi=(50, 30, 30, 60)):  # x,y,w,h
+    x, y, w, h = roi
+    crop = frame[y:y+h, x:x+w]
+    hsv  = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+
+    # máscaras simples (ajuste para seu vídeo):
+    red1 = cv2.inRange(hsv, (0,100,100), (10,255,255))
+    red2 = cv2.inRange(hsv, (160,100,100), (180,255,255))
+    green = cv2.inRange(hsv, (40, 50, 50), (90,255,255))
+
+    red_px   = cv2.countNonZero(red1 | red2)
+    green_px = cv2.countNonZero(green)
+
+    cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+    return "green" if green_px > red_px else "red"
+
 # Carregar modelo
 classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4-csp-swish.weights')
 
 line_y = None 
 
+#MAIN
 for idx, frame in enumerate(frame_generator(DAIR_V2X_PATH)):
     # Definindo a linha horizontal
     if line_y is None:        
@@ -118,17 +139,24 @@ for idx, frame in enumerate(frame_generator(DAIR_V2X_PATH)):
 
     tracks = tracker.update(detections)
     
+    # Checando o cruzamento
     for track in tracks.astype(int):
         x1, y1, x2, y2, track_id = track
         w = x2 - x1
         h = y2 - y1
         draw_boxes(x1, y1, w, h, frame, "vehicle",  track_id)
 
-        #checando se passou da linha
+        # definindo o lado do veículo
         center_y = (y1+y2)//2 #centro atual
         side    = "below" if center_y > line_y else "above"
         last = track_state.get(track_id) # ultima posição
-        if last == "above" and side == "below" and track_id not in counted_ids:
+
+        # checagem do sinal
+        light = detect_light(frame)
+        print(light)
+
+        # checagem de cruzamento
+        if last == "below" and side == "above" and track_id not in counted_ids:
             total_count += 1
             counted_ids.add(track_id)
             print(f"Veículo {track_id} contado! Total = {total_count}")
