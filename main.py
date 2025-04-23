@@ -8,7 +8,7 @@ VIDEO1_PATH = 'samples/video1.mp4'
 VIDEO2_PATH = 'samples/video2.mp4'
 
 # Inicializa o SORT
-tracker = Sort(max_age=10, min_hits=3)
+tracker = Sort(max_age=15, min_hits=3, iou_threshold=0.3)
 vehicle_ids = set()
 
 #Variáveis para contagem de carros
@@ -16,10 +16,10 @@ vehicle_ids = set()
 prev_centroids = {}     # id → y do frame anterior
 counted_ids    = set()  # ids já contados
 total_count    = 0
+track_state = {}
 
 # Variáveis de frameskip
-frame_skip   = 10        # ⇒ processa 1 de cada 3 quadros
-frame_index  = 0        # contador global
+frame_skip   = 3        # ⇒ processa 1 de cada 3 quadros
 
 def draw_boxes (x, y, h, w, frame, class_name, obj_id=None):
     #Desenha a bounding box
@@ -106,35 +106,45 @@ def frame_generator(input_path):
 # Carregar modelo
 classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4-csp-swish.weights')
 
-for frame in frame_generator(VIDEO1_PATH):
+empty = np.empty((0, 5))
+line_y = None 
 
+for idx, frame in enumerate(frame_generator(VIDEO1_PATH)):
     # Definindo a linha horizontal
-    line_y = int(frame.shape[0] * 0.55)   # 65 % da altura
+    if line_y is None:        
+        line_y = int(frame.shape[0] * 0.55)
 
-    if frame_index % frame_skip == 0:
+    if idx % frame_skip == 0:          # roda YOLO
         detections = detect_vehicles(frame)
-        tracks = tracker.update(detections)
-        
-        for track in tracks:
-            x1, y1, x2, y2, track_id = track
-            w = int(x2 - x1)
-            h = int(y2 - y1)
-            draw_boxes(int(x1), int(y1), w, h, frame, "vehicle",  track_id)
+    if detections.size:            # anexa coluna "score"
+        detections = np.hstack((detections,
+                                    np.ones((detections.shape[0], 1))))
+    else:                              # só predição
+        detections = empty
 
-            #checando se passou da linha
-            center_y = (y1+y2)//2 #centro atual
-            prev_center = prev_centroids.get(track_id) #centros anteriores
-            if prev_center is not None:
-                # Exemplo: conta quando vem de cima (prev < line) e passa para baixo (cy ≥ line)
-                if (prev_center < line_y) and (center_y>=line_y):     #Se o anterior estava antes do treshold e o atual depois, cruzou a linha
-                    if track_id not in counted_ids:    
-                        total_count += 1
-                        counted_ids.add(track_id)
-                        print(f"Veículo {track_id} contado! Total = {total_count}")
+    tracks = tracker.update(detections)
+    
+    for track in tracks.astype(int):
+        x1, y1, x2, y2, track_id = track
+        w = x2 - x1
+        h = y2 - y1
+        draw_boxes(x1, y1, w, h, frame, "vehicle",  track_id)
+
+        #checando se passou da linha
+        center_y = (y1+y2)//2 #centro atual
+        prev_center = prev_centroids.get(track_id) #centros anteriores
+
+        if prev_center is not None:
+            # Exemplo: conta quando vem de cima (prev < line) e passa para baixo (cy ≥ line)
+            if (prev_center < line_y) and (center_y>=line_y):     #Se o anterior estava antes do treshold e o atual depois, cruzou a linha
+                if track_id not in counted_ids:    
+                    total_count += 1
+                    counted_ids.add(track_id)
+                    print(f"Veículo {track_id} contado! Total = {total_count}")
 
 
-            #Atualiza a posição do centro
-            prev_centroids[track_id] = center_y
+        #Atualiza a posição do centro
+        prev_centroids[track_id] = center_y
 
     #printa a linha
     cv2.line(frame, (0, line_y), (frame.shape[1], line_y), (255, 0, 0), 2)
@@ -143,7 +153,6 @@ for frame in frame_generator(VIDEO1_PATH):
 
         
     cv2.imshow("Detecção com Tracking", frame)
-
     if cv2.waitKey(1) & 0xFF == 27:
         break
 
