@@ -84,7 +84,10 @@ def detect_vehicles(frame):
         for i in indices.flatten():
             final_boxes.append(boxes[i])
     
-    return np.array(final_boxes)
+    if final_boxes:
+        return np.array(final_boxes, dtype=float)
+    else:
+        return np.empty((0, 4), dtype=float)
 
 def frame_generator(input_path):
     # Caso seja uma pasta de imagens ( *.jpg)
@@ -137,7 +140,7 @@ classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4
 line = None 
 
 #MAIN
-for idx, frame in enumerate(frame_generator(DAIR_V2X_PATH)):
+for idx, frame in enumerate(frame_generator(VIDEO2_PATH)):
     #Configurando linha e retângulo
     if(idx == 0):
         roi, line = select_roi_and_line(frame)
