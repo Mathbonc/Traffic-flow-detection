@@ -237,21 +237,24 @@ def check_intersection(track: np.ndarray, frame: np.ndarray, roi: tuple[int, int
     return track_state, counted_ids, total_count
 
 def run_traffic_counter(path):
-    #Variáveis para contagem de carros
-    counted_ids = set()  # IDs de carros já contados
-    total_count = 0
-    track_state = {}     #  Estado: passou ou não a linha
-    line = None     
+    """Executa todo o pipeline em `path`.
 
-    #MAIN
+    Parameters
+    ----------
+    path
+        Caminho para vídeo ou glob de imagens.
+    """
+    total_count   = 0
+    counted_ids   = set()
+    track_state   = {}
+    line, roi     = None, None  
+
     for idx, frame in enumerate(frame_generator(path)):
-        #Configurando linha e retângulo
         if(idx == 0):
             roi, line = select_roi_and_line(frame)
 
         if idx % FRAME_SKIP == 0:         
             detections = detect_vehicles(frame)
-
         tracks = tracker.update(detections)
         
         # Loop para contagem de carros
@@ -265,9 +268,7 @@ def run_traffic_counter(path):
         cv2.line(frame, line[:2], line[2:], (255, 0, 0), 2)
         cv2.putText(frame, f"Count: {total_count}", (20, 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
-
-            
-        cv2.imshow("Detecção com Tracking", frame)
+        cv2.imshow("TrafficCounter", frame)
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
