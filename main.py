@@ -137,11 +137,23 @@ def frame_generator(path: str):
     else:
         raise ValueError("Formato de entrada não suportado.")
 
-def detect_light(frame, roi):  
+def detect_light(frame: np.ndarray, roi: tuple[int, int, int, int]) -> str:  
+    """Detecta cor dominante (verde/vermelho) no retângulo do semáforo.
+
+    Parameters
+    ----------
+    frame
+        Nº‑array BGR do frame.
+    roi
+        Tupla `(x, y, w, h)` com a ROI onde fica a lâmpada.
+
+    Returns
+    -------
+    "green" ou "red".
+    """
     x, y, w, h = roi
     crop = frame[y:y+h, x:x+w]
     hsv  = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-
     # máscaras simples 
     red1 = cv2.inRange(hsv, (0,100,100), (10,255,255))
     red2 = cv2.inRange(hsv, (160,100,100), (180,255,255))
@@ -151,7 +163,6 @@ def detect_light(frame, roi):
     green_px = cv2.countNonZero(green)
 
     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
-
     return "green" if green_px > red_px else "red"
 
 def side_of_line(px, py, line):
