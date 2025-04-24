@@ -8,7 +8,7 @@ Executa o pipeline completo:
 5. Geração de relatórios CSV via report_utils.
 
 Uso:
-    python main.py --video samples/video4.mp4
+    python main.py 
 
 Autor: <Matheus Júlio Boncsidai de Oliveira>
 """
@@ -56,6 +56,10 @@ def draw_bboxes(x: int, y: int, h: int, w: int, frame: np.ndarray, class_name: s
 def load_model(cfg: str, weights: str) -> tuple[list[str], cv2.dnn_Net]:
     """Carrega a rede YOLO a partir de arquivos *cfg* e *weights*.
 
+    Parameters
+    ----------
+    cfg, weights
+        Caminho relativo para o arquivo .cfg OU .weights do YOLO
     Returns
     -------
     classes
