@@ -20,7 +20,7 @@ from sort import Sort
 from config_rect import *
 import report_utils
 
-VIDEO_PATH = "samples/video4.mp4"   # caminho padrão (pode vir via argparse)
+VIDEO_PATH = "samples/DAIR-V2X-C/*.jpg"   # caminho padrão (pode vir via argparse)
 MARGIN      = 3                      # histerese em pixels
 FRAME_SKIP  = 2                      # roda YOLO a cada N frames
 FPS_FALLBACK = 30                    # usado se não obtiver FPS do vídeo
@@ -31,13 +31,26 @@ tracker = Sort(max_age=30, min_hits=3, iou_threshold=0.3)
 # Classe para registrar e salvar os dados: report_utils.TrafficReport(FPS) 
 report = report_utils.TrafficReport(FPS_FALLBACK)
 
-def draw_bboxes (x, y, h, w, frame, class_name, obj_id=None):
-    label = f"{class_name}"
-    if obj_id is not None:
-        label += f" ID:{int(obj_id)}"
+def draw_bboxes(x: int, y: int, h: int, w: int, frame: np.ndarray, class_name: str,
+                obj_id: int | None = None) -> None:
+    """Desenha bounding‑box + rótulo.
 
+    Parameters
+    ----------
+    x, y, h, w
+        Coordenadas/cotas da caixa no formato OpenCV.
+    frame
+        Frame BGR sobre o qual desenhar.
+    class_name
+        Nome da classe (ex.: "vehicle").
+    obj_id
+        ID opcional atribuído pelo rastreador; se fornecido, é adicionado ao
+        rótulo.
+    """
+    label = class_name if obj_id is None else f"{class_name} ID:{obj_id}"
     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+                0.6, (0, 255, 0), 2)
 
 def load_model(cfg, weights):
     with open("yolo_models/coco.names", "r") as f:
