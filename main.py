@@ -1,3 +1,18 @@
+"""main.py – Sistema Inteligente de Contagem de Carros em Semáforo
+
+Executa o pipeline completo:
+1. Seleção interativa de ROI (semáforo) e linha virtual.
+2. Detecção de veículos com YOLO.
+3. Rastreamento com SORT.
+4. Contagem condicionada ao sinal verde.
+5. Geração de relatórios CSV via report_utils.
+
+Uso:
+    python main.py --video samples/video4.mp4
+
+Autor: <Matheus Júlio Boncsidai de Oliveira>
+"""
+
 import cv2
 import glob
 import numpy as np
@@ -5,19 +20,16 @@ from sort import Sort
 from config_rect import *
 import report_utils
 
-DAIR_V2X_PATH = 'samples/DAIR-V2X-C/*.jpg'
-VIDEO1_PATH = 'samples/video1.mp4'
-VIDEO2_PATH = 'samples/video2.mp4'
-VIDEO3_PATH = 'samples/video3.mp4'
-VIDEO4_PATH = 'samples/video4.mp4'
-VIDEO5_PATH = 'samples/video5.mp4'
-MARGIN = 3
+VIDEO_PATH = "samples/video4.mp4"   # caminho padrão (pode vir via argparse)
+MARGIN      = 3                      # histerese em pixels
+FRAME_SKIP  = 2                      # roda YOLO a cada N frames
+FPS_FALLBACK = 30                    # usado se não obtiver FPS do vídeo
 
 # Inicializa o SORT
 tracker = Sort(max_age=30, min_hits=3, iou_threshold=0.3)
 
 # Classe para registrar e salvar os dados: report_utils.TrafficReport(FPS) 
-report = report_utils.TrafficReport(30)
+report = report_utils.TrafficReport(FPS_FALLBACK)
 
 def draw_bboxes (x, y, h, w, frame, class_name, obj_id=None):
     label = f"{class_name}"
@@ -164,10 +176,7 @@ def run_traffic_counter(path):
     counted_ids = set()  # IDs de carros já contados
     total_count = 0
     track_state = {}     #  Estado: passou ou não a linha
-    line = None
-
-    # Variáveis de frameskip
-    frame_skip = 2      
+    line = None     
 
     #MAIN
     for idx, frame in enumerate(frame_generator(path)):
@@ -175,7 +184,7 @@ def run_traffic_counter(path):
         if(idx == 0):
             roi, line = select_roi_and_line(frame)
 
-        if idx % frame_skip == 0:         
+        if idx % FRAME_SKIP == 0:         
             detections = detect_vehicles(frame)
 
         tracks = tracker.update(detections)
@@ -200,7 +209,7 @@ def run_traffic_counter(path):
 # Carregar modelo
 classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4-csp-swish.weights')
 
-run_traffic_counter(DAIR_V2X_PATH)
+run_traffic_counter(VIDEO_PATH)
 
 
 report.save()
