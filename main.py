@@ -2,6 +2,7 @@ import cv2
 import glob
 import numpy as np
 from sort import Sort 
+from config_rect import *
 
 DAIR_V2X_PATH = 'samples/DAIR-V2X-C/*.jpg'
 VIDEO1_PATH = 'samples/video1.mp4'
@@ -106,7 +107,7 @@ def frame_generator(input_path):
     else:
         raise ValueError("Formato de entrada não suportado.")
 
-def detect_light(frame, roi=(50, 30, 30, 60)):  # x,y,w,h
+def detect_light(frame, roi):  # x,y,w,h
     x, y, w, h = roi
     crop = frame[y:y+h, x:x+w]
     hsv  = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
@@ -119,20 +120,27 @@ def detect_light(frame, roi=(50, 30, 30, 60)):  # x,y,w,h
     red_px   = cv2.countNonZero(red1 | red2)
     green_px = cv2.countNonZero(green)
 
-    cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
 
     return "green" if green_px > red_px else "red"
+
+def side_of_line(px, py, line):
+    if line is None:
+        raise ValueError("Parâmetro 'line' é None – defina (x1,y1,x2,y2) antes de chamar.")
+    x1, y1, x2, y2 = line
+    return (x2 - x1)*(py - y1) - (y2 - y1)*(px - x1)
+
 
 # Carregar modelo
 classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4-csp-swish.weights')
 
-line_y = None 
+line = None 
 
 #MAIN
 for idx, frame in enumerate(frame_generator(DAIR_V2X_PATH)):
-    # Definindo a linha horizontal
-    if line_y is None:        
-        line_y = int(frame.shape[0] * 0.55)
+    #Configurando linha e retângulo
+    if(idx == 0):
+        roi, line = select_roi_and_line(frame)
 
     if idx % frame_skip == 0:         
         detections = detect_vehicles(frame)
@@ -147,26 +155,29 @@ for idx, frame in enumerate(frame_generator(DAIR_V2X_PATH)):
         draw_boxes(x1, y1, w, h, frame, "vehicle",  track_id)
 
         # definindo o lado do veículo
+        center_x = (x1+x2)//2 #centro atual
         center_y = (y1+y2)//2 #centro atual
-        side    = "below" if center_y > line_y else "above"
+ 
+        pos = side_of_line(center_x,center_y, line)
         last = track_state.get(track_id) # ultima posição
 
+
         # checagem do sinal
-        light = detect_light(frame)
-        print(light)
+        light = detect_light(frame, roi)
+        print(pos)
 
         # checagem de cruzamento
-        if last == "below" and side == "above" and track_id not in counted_ids:
+        if last is not None and last > 0 and pos <= 0 and track_id not in counted_ids:
             total_count += 1
             counted_ids.add(track_id)
             print(f"Veículo {track_id} contado! Total = {total_count}")
 
 
         #Atualiza a posição 
-        track_state[track_id]   = side
+        track_state[track_id] = pos
 
     #printa a linha
-    cv2.line(frame, (0, line_y), (frame.shape[1], line_y), (255, 0, 0), 2)
+    cv2.line(frame, line[:2], line[2:], (255, 0, 0), 2)
     cv2.putText(frame, f"Count: {total_count}", (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
 
