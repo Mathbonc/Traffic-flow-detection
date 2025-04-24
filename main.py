@@ -27,6 +27,7 @@ FPS_FALLBACK = 30                    # usado se não obtiver FPS do vídeo
 
 # Inicializa o SORT
 tracker = Sort(max_age=30, min_hits=3, iou_threshold=0.3)
+classes, net = None, None  # definidos em load_model()
 
 # Classe para registrar e salvar os dados: report_utils.TrafficReport(FPS) 
 report = report_utils.TrafficReport(FPS_FALLBACK)
@@ -52,7 +53,16 @@ def draw_bboxes(x: int, y: int, h: int, w: int, frame: np.ndarray, class_name: s
     cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
                 0.6, (0, 255, 0), 2)
 
-def load_model(cfg, weights):
+def load_model(cfg: str, weights: str) -> tuple[list[str], cv2.dnn_Net]:
+    """Carrega a rede YOLO a partir de arquivos *cfg* e *weights*.
+
+    Returns
+    -------
+    classes
+        Lista de rótulos disponíveis no modelo.
+    net
+        Objeto `cv2.dnn_Net` pronto para inferência.
+    """
     with open("yolo_models/coco.names", "r") as f:
         classes = [line.strip() for line in f.readlines()]
     net = cv2.dnn.readNetFromDarknet(cfg, weights)
