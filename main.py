@@ -165,7 +165,21 @@ def detect_light(frame: np.ndarray, roi: tuple[int, int, int, int]) -> str:
     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
     return "green" if green_px > red_px else "red"
 
-def side_of_line(px, py, line):
+def side_of_line(px: int, py: int, line: tuple[int, int, int, int]) -> float:
+    """Retorna o sinal do produto vetorial ponto‑linha.
+
+     Parameters
+    ----------
+    px, py
+        Coordenadas do ponto analisado (centro do bound box)
+    line
+        Linha previamente definida como ponto de cruzamento
+     Returns
+    -------
+    > 0  → ponto de um lado da linha
+    < 0  → lado oposto
+    = 0  → sobre a linha
+    """
     if line is None:
         raise ValueError("Parâmetro 'line' é None – defina (x1,y1,x2,y2) antes de chamar.")
     x1, y1, x2, y2 = line
