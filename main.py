@@ -110,18 +110,24 @@ def detect_vehicles(frame: np.ndarray) -> np.ndarray:
     final = [boxes[i] for i in indices.flatten()] if len(indices) else []
     return np.asarray(final, dtype=float) if final else np.empty((0, 4), dtype=float)
 
-def frame_generator(input_path):
+def frame_generator(path: str):
+    """Itera sobre frames de um vídeo ou lista de imagens.
+
+    Parameters
+    ----------
+    path
+        Caminho para vídeo (`.mp4`, `.avi`, ...), ou glob `*.jpg`.
+    """
     # Caso seja uma pasta de imagens ( *.jpg)
-    if "*" in input_path:
-        image_files = glob.glob(input_path)
+    if "*" in path:
+        image_files = glob.glob(path)
         for image_path in image_files:
             frame = cv2.imread(image_path)
             if frame is not None:
                 yield frame
-
     # Caso seja um vídeo
-    elif input_path.endswith((".mp4", ".avi", ".mov")):
-        cap = cv2.VideoCapture(input_path)
+    elif path.endswith((".mp4", ".avi", ".mov")):
+        cap = cv2.VideoCapture(path)
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
