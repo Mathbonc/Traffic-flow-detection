@@ -185,19 +185,39 @@ def side_of_line(px: int, py: int, line: tuple[int, int, int, int]) -> float:
     x1, y1, x2, y2 = line
     return (x2 - x1)*(py - y1) - (y2 - y1)*(px - x1)
 
-def check_intersection(track, frame, roi, line, track_state, total_count, counted_ids, idx):
+def check_intersection(track: np.ndarray, frame: np.ndarray, roi: tuple[int, int, int, int],
+                       line: tuple[int, int, int, int], track_state: dict[int, float],
+                       counted_ids: set[int], total_count: int, idx: int) -> tuple[dict, set, int]:
+    """Avalia se uma trilha cruzou a linha e atualiza contagem.
+
+    Parameters
+    ----------
+    track
+        Vetor `[x1,y1,x2,y2,id]` (inteiros).
+    frame
+        Frame atual para desenhar bound box.
+    roi, line
+        Região do semáforo e linha virtual.
+    track_state
+        Mapping id → último *side* calculado.
+    counted_ids
+        Conjunto de IDs já contabilizados.
+    total_count
+        Contador global.
+    idx
+        Índice do frame (para registrar timestamp).
+
+    Returns
+    -------
+    track_state, counted_ids, total_count  (possivelmente atualizados)
+    """
     x1, y1, x2, y2, track_id = track
-    w = x2 - x1
-    h = y2 - y1
-    draw_bboxes(x1, y1, w, h, frame, "vehicle",  track_id)
+    draw_bboxes(x1, y1, x2 - x1, y2 - y1, frame, "vehicle", track_id)
 
     # Posição atual do veículo
-    center_x = (x1+x2)//2 
-    center_y = (y1+y2)//2
-    pos = side_of_line(center_x,center_y, line)
+    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+    pos = side_of_line(cx,cy, line)
     last_pos = track_state.get(track_id) 
-
-    # checagem do sinal
     light = detect_light(frame, roi)
 
     # checagem de cruzamento
@@ -214,7 +234,6 @@ def check_intersection(track, frame, roi, line, track_state, total_count, counte
 
     #Atualiza a última posição de acordo com o id
     track_state[track_id] = pos
-
     return track_state, counted_ids, total_count
 
 def run_traffic_counter(path):
@@ -239,8 +258,8 @@ def run_traffic_counter(path):
         for track in tracks.astype(int):
             track_state, counted_ids, total_count = check_intersection(track, frame, 
                                                                     roi, line, 
-                                                                    track_state, total_count, 
-                                                                    counted_ids, idx)
+                                                                    track_state, counted_ids, 
+                                                                    total_count, idx)
         # Interface: linha de cruzamento
         #            quantidade de carros contados
         cv2.line(frame, line[:2], line[2:], (255, 0, 0), 2)
