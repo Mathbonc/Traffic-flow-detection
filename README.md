@@ -1,14 +1,12 @@
 # Sistema Inteligente de Contagem de Carros em Semáforo
 
-![banner](docs/demo.gif) <!-- substitua por link ou GIF/MP4 curto -->
-
 > **Propósito** — Contar veículos que atravessam um ponto de interseção, respeitando o estado do semáforo (verde/vermelho), a partir de qualquer vídeo de câmera fixa.
 
 ---
 
 ## ● Demonstração
 
-Coloque aqui um GIF ou vídeo de ~10 s mostrando:
+[![Watch the demo](https://img.youtube.com/vi/0omgnuImMUI/0.jpg)](https://youtu.be/0omgnuImMUI)
 1. Seleção do semáforo (retângulo verde) e da linha virtual (linha azul).
 2. Rastreamento das bounding‑boxes (retângulos) e incremento do contador.
 3. Geração dos CSVs de relatório.
