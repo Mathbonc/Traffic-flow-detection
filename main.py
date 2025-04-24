@@ -70,53 +70,45 @@ def load_model(cfg: str, weights: str) -> tuple[list[str], cv2.dnn_Net]:
     net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
     return classes, net
 
-def detect_vehicles(frame):
-    blob = cv2.dnn.blobFromImage(frame, 1/255.0, (416, 416), swapRB=True, crop=False)
-    net.setInput(blob)
+def detect_vehicles(frame: np.ndarray) -> np.ndarray:
+    """Executa YOLO e devolve bounding‑boxes de veículos.
 
-    # Pegar os nomes das camadas de saída
+    Se não houver detecções, devolve um array vazio `(0, 4)` — isso mantém
+    o SORT vivo apenas em modo predição.
+    """
+    blob = cv2.dnn.blobFromImage(frame, 1/255.0, (416, 416), swapRB=True, 
+                                crop=False)
+    net.setInput(blob)
     layer_names = net.getLayerNames()
     output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers().flatten()]
-
-    # Forward devolve o resultado da inferência
-    detections = net.forward(output_layers)
+    detections = net.forward(output_layers)   # Forward devolve o resultado da inferência
   
-    boxes = []
-    confidences = []
-
+    boxes, confidences = [], []
     h, w = frame.shape[:2]
+    
     for output in detections:
-        for detection in output:
-
-            scores = detection[5:]
-            class_id = scores.argmax()
+        for det in output:
+            scores = det[5:]
+            class_id = int(np.argmax(scores))
+            if classes[class_id] not in {"car", "truck", "bus", "motorbike"}:
+                continue
             confidence = scores[class_id]
-
-            if classes[class_id] in ["car", "truck", "bus", "motorbike"] and confidence > 0.5:
-                cx = int(detection[0] * w)
-                cy = int(detection[1] * h)
-                bw = int(detection[2] * w)
-                bh = int(detection[3] * h)
-                x = int(cx - bw / 2)
-                y = int(cy - bh / 2)
-                boxes.append([x, y, x + bw, y + bh])
-                confidences.append(float(confidence))
+            if confidence < 0.5:
+                continue
+            cx, cy, bw, bh = det[:4]
+            cx, cy = int(cx * w), int(cy * h)
+            bw, bh = int(bw * w), int(bh * h)
+            x, y = int(cx - bw / 2), int(cy - bh / 2)
+            boxes.append([x, y, x + bw, y + bh])
+            confidences.append(float(confidence))
       
     indices = cv2.dnn.NMSBoxes(boxes, 
                                confidences, 
                                score_threshold=0.5, 
                                nms_threshold=0.4)
 
-    final_boxes = []
-    if len(indices) > 0:
-        for i in indices.flatten():
-            final_boxes.append(boxes[i])
-    
-    if final_boxes:
-        return np.array(final_boxes, dtype=float)
-    else:
-        # Retorna um array vazio; útil para manter inferência do tracker
-        return np.empty((0, 4), dtype=float)
+    final = [boxes[i] for i in indices.flatten()] if len(indices) else []
+    return np.asarray(final, dtype=float) if final else np.empty((0, 4), dtype=float)
 
 def frame_generator(input_path):
     # Caso seja uma pasta de imagens ( *.jpg)
