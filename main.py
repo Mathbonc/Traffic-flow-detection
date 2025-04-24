@@ -272,11 +272,9 @@ def run_traffic_counter(path):
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
-# Carregar modelo
-classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4-csp-swish.weights')
-
-run_traffic_counter(VIDEO_PATH)
-
-
-report.save()
-cv2.destroyAllWindows()
+if __name__ == "__main__":
+    classes, net = load_model("yolo_models/yolov4-csp-swish.cfg",
+                              "yolo_models/yolov4-csp-swish.weights")
+    run_traffic_counter(VIDEO_PATH)
+    report.save()
+    cv2.destroyAllWindows()
