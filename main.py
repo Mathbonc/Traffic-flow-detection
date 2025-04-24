@@ -15,26 +15,25 @@ MARGIN = 3
 
 # Inicializa o SORT
 tracker = Sort(max_age=30, min_hits=3, iou_threshold=0.3)
-vehicle_ids = set()
 
 #Variáveis para contagem de carros
-# Variáveis para detectar a passagem de carros da linha
-prev_centroids = {}     # id → y do frame anterior
-counted_ids    = set()  # ids já contados
-total_count    = 0
-track_state = {}
+counted_ids = set()  # IDs de carros já contados
+total_count = 0
+track_state = {}     #  Estado: passou ou não a linha
+line = None
 
 # Variáveis de frameskip
-frame_skip   = 2        # ⇒ processa 1 de cada 3 quadros
+frame_skip = 2      
 
-def draw_boxes (x, y, h, w, frame, class_name, obj_id=None):
-    #Desenha a bounding box
-    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+# Classe para registrar e salvar os dados: report_utils.TrafficReport(FPS) 
+report = report_utils.TrafficReport(30)
 
+def draw_bboxes (x, y, h, w, frame, class_name, obj_id=None):
     label = f"{class_name}"
     if obj_id is not None:
         label += f" ID:{int(obj_id)}"
 
+    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
     cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
 def load_model(cfg, weights):
@@ -46,7 +45,6 @@ def load_model(cfg, weights):
     return classes, net
 
 def detect_vehicles(frame):
-    # Criar blob
     blob = cv2.dnn.blobFromImage(frame, 1/255.0, (416, 416), swapRB=True, crop=False)
     net.setInput(blob)
 
@@ -54,7 +52,7 @@ def detect_vehicles(frame):
     layer_names = net.getLayerNames()
     output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers().flatten()]
 
-    # Forward recebe o resultado da inferência
+    # Forward devolve o resultado da inferência
     detections = net.forward(output_layers)
   
     boxes = []
@@ -77,9 +75,11 @@ def detect_vehicles(frame):
                 y = int(cy - bh / 2)
                 boxes.append([x, y, x + bw, y + bh])
                 confidences.append(float(confidence))
-
-            
-    indices = cv2.dnn.NMSBoxes(boxes, confidences, score_threshold=0.5, nms_threshold=0.4)
+      
+    indices = cv2.dnn.NMSBoxes(boxes, 
+                               confidences, 
+                               score_threshold=0.5, 
+                               nms_threshold=0.4)
 
     final_boxes = []
     if len(indices) > 0:
@@ -89,6 +89,7 @@ def detect_vehicles(frame):
     if final_boxes:
         return np.array(final_boxes, dtype=float)
     else:
+        # Retorna um array vazio; útil para manter inferência do tracker
         return np.empty((0, 4), dtype=float)
 
 def frame_generator(input_path):
@@ -112,12 +113,12 @@ def frame_generator(input_path):
     else:
         raise ValueError("Formato de entrada não suportado.")
 
-def detect_light(frame, roi):  # x,y,w,h
+def detect_light(frame, roi):  
     x, y, w, h = roi
     crop = frame[y:y+h, x:x+w]
     hsv  = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
 
-    # máscaras simples (ajuste para seu vídeo):
+    # máscaras simples 
     red1 = cv2.inRange(hsv, (0,100,100), (10,255,255))
     red2 = cv2.inRange(hsv, (160,100,100), (180,255,255))
     green = cv2.inRange(hsv, (40, 50, 50), (90,255,255))
@@ -139,12 +140,9 @@ def side_of_line(px, py, line):
 # Carregar modelo
 classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4-csp-swish.weights')
 
-line = None 
-
-report = report_utils.TrafficReport(30)
 
 #MAIN
-for idx, frame in enumerate(frame_generator(VIDEO4_PATH)):
+for idx, frame in enumerate(frame_generator(DAIR_V2X_PATH)):
     #Configurando linha e retângulo
     if(idx == 0):
         roi, line = select_roi_and_line(frame)
@@ -154,39 +152,39 @@ for idx, frame in enumerate(frame_generator(VIDEO4_PATH)):
 
     tracks = tracker.update(detections)
     
-    # Checando o cruzamento
+    # Loop para contagem de carros
     for track in tracks.astype(int):
         x1, y1, x2, y2, track_id = track
         w = x2 - x1
         h = y2 - y1
-        draw_boxes(x1, y1, w, h, frame, "vehicle",  track_id)
+        draw_bboxes(x1, y1, w, h, frame, "vehicle",  track_id)
 
-        # definindo o lado do veículo
-        center_x = (x1+x2)//2 #centro atual
-        center_y = (y1+y2)//2 #centro atual
- 
+        # Posição atual do veículo
+        center_x = (x1+x2)//2 
+        center_y = (y1+y2)//2
         pos = side_of_line(center_x,center_y, line)
-        last = track_state.get(track_id) # ultima posição
-
+        last_pos = track_state.get(track_id) 
 
         # checagem do sinal
         light = detect_light(frame, roi)
 
         # checagem de cruzamento
-        if (last is not None):
-            cross_AtoB = last >  MARGIN and pos <= -MARGIN    # sentido +
-            cross_BtoA = last < -MARGIN and pos >=  MARGIN    # sentido –
-            if (cross_AtoB or cross_BtoA) and (track_id not in counted_ids) and (light == "green"):
+        if (last_pos is not None):
+            cross_AtoB = last_pos >  MARGIN and pos <= -MARGIN    # sentido +
+            cross_BtoA = last_pos < -MARGIN and pos >=  MARGIN    # sentido –
+            # Checa cruzamento, se o ID já cruzou, cor do semáforo
+            if ((cross_AtoB or cross_BtoA) and 
+                (track_id not in counted_ids) and 
+                (light == "green")):
                 total_count += 1
                 counted_ids.add(track_id)
                 report.log(idx,track_id, light)
-                # print(f"Veículo {track_id} contado! Total = {total_count}")
 
-
-        #Atualiza a posição 
+        #Atualiza a última posição de acordo com o id
         track_state[track_id] = pos
 
-    #printa a linha
+    # Interface: linha de cruzamento
+    #            quantidade de carros contados
     cv2.line(frame, line[:2], line[2:], (255, 0, 0), 2)
     cv2.putText(frame, f"Count: {total_count}", (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
