@@ -3,6 +3,7 @@ import glob
 import numpy as np
 from sort import Sort 
 from config_rect import *
+import report_utils
 
 DAIR_V2X_PATH = 'samples/DAIR-V2X-C/*.jpg'
 VIDEO1_PATH = 'samples/video1.mp4'
@@ -10,6 +11,7 @@ VIDEO2_PATH = 'samples/video2.mp4'
 VIDEO3_PATH = 'samples/video3.mp4'
 VIDEO4_PATH = 'samples/video4.mp4'
 VIDEO5_PATH = 'samples/video5.mp4'
+MARGIN = 3
 
 # Inicializa o SORT
 tracker = Sort(max_age=30, min_hits=3, iou_threshold=0.3)
@@ -139,6 +141,8 @@ classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4
 
 line = None 
 
+report = report_utils.TrafficReport(30)
+
 #MAIN
 for idx, frame in enumerate(frame_generator(VIDEO4_PATH)):
     #Configurando linha e retângulo
@@ -170,12 +174,13 @@ for idx, frame in enumerate(frame_generator(VIDEO4_PATH)):
 
         # checagem de cruzamento
         if (last is not None):
-            CROSS_AtoB = ( last > 0 and pos <= 0 )        # sentido A → B
-            CROSS_BtoA = ( last < 0 and pos >= 0 ) 
-            if (CROSS_AtoB or CROSS_BtoA) and (track_id not in counted_ids) and (light == "green"):
+            cross_AtoB = last >  MARGIN and pos <= -MARGIN    # sentido +
+            cross_BtoA = last < -MARGIN and pos >=  MARGIN    # sentido –
+            if (cross_AtoB or cross_BtoA) and (track_id not in counted_ids) and (light == "green"):
                 total_count += 1
                 counted_ids.add(track_id)
-                print(f"Veículo {track_id} contado! Total = {total_count}")
+                report.log(idx,track_id, light)
+                # print(f"Veículo {track_id} contado! Total = {total_count}")
 
 
         #Atualiza a posição 
@@ -191,4 +196,5 @@ for idx, frame in enumerate(frame_generator(VIDEO4_PATH)):
     if cv2.waitKey(1) & 0xFF == 27:
         break
 
+report.save()
 cv2.destroyAllWindows()
