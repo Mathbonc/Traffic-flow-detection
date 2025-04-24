@@ -32,17 +32,31 @@ class TrafficReport:
         # 2) resumo
         total      = len(self.events)
         total_time = self.events[-1][1]
+
+        df = pd.DataFrame(self.events, columns=["frame","sec","id","light"])
+        cont_light = (df["light"].value_counts()
+                        .reindex(["green","red"])
+                        .fillna(0)
+                        .astype(int))
+
         resumo_file = os.path.join(self.out, "resumo.csv")
         with open(resumo_file, "w", newline="") as f:
             wr = csv.writer(f)
-            wr.writerow(["total_veiculos","duracao_s","fps",
-                         "veic_por_min","veic_por_seg"])
-            wr.writerow([total,
-                         round(total_time,2),
-                         self.fps,
-                         round(total / (total_time/60),2),
-                         round(total / total_time,3)])
-
+            wr.writerow([
+                "total_veiculos", "duracao_s", "fps",
+                "veic_por_min", "veic_por_seg",
+                "veic_sinal_verde", "veic_sinal_vermelho"
+            ])
+            wr.writerow([
+                total,
+                round(total_time, 2),
+                self.fps,
+                round(total / (total_time/60), 2),
+                round(total / total_time, 3),
+                int(cont_light["green"]),
+                int(cont_light["red"])
+            ])
+            
         # 3) distribuição temporal (1 min)
         df = pd.DataFrame(self.events,
                           columns=["frame","sec","id","light"])
