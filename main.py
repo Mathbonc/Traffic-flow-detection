@@ -140,7 +140,7 @@ classes, net = load_model('yolo_models/yolov4-csp-swish.cfg','yolo_models/yolov4
 line = None 
 
 #MAIN
-for idx, frame in enumerate(frame_generator(VIDEO2_PATH)):
+for idx, frame in enumerate(frame_generator(VIDEO4_PATH)):
     #Configurando linha e retângulo
     if(idx == 0):
         roi, line = select_roi_and_line(frame)
@@ -167,13 +167,15 @@ for idx, frame in enumerate(frame_generator(VIDEO2_PATH)):
 
         # checagem do sinal
         light = detect_light(frame, roi)
-        print(pos)
 
         # checagem de cruzamento
-        if last is not None and last > 0 and pos <= 0 and track_id not in counted_ids:
-            total_count += 1
-            counted_ids.add(track_id)
-            print(f"Veículo {track_id} contado! Total = {total_count}")
+        if (last is not None):
+            CROSS_AtoB = ( last > 0 and pos <= 0 )        # sentido A → B
+            CROSS_BtoA = ( last < 0 and pos >= 0 ) 
+            if (CROSS_AtoB or CROSS_BtoA) and (track_id not in counted_ids) and (light == "green"):
+                total_count += 1
+                counted_ids.add(track_id)
+                print(f"Veículo {track_id} contado! Total = {total_count}")
 
 
         #Atualiza a posição 
