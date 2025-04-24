@@ -1,0 +1,7 @@
+yolo_models/*weights
+out/
+*.log
+*.pyc
+__pycache__/
+.DS_Store
+teste.py
