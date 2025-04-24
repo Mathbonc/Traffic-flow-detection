@@ -21,9 +21,9 @@ from config_rect import *
 import report_utils
 
 VIDEO_PATH = "samples/DAIR-V2X-C/*.jpg"   # caminho padrão (pode vir via argparse)
-MARGIN      = 3                      # histerese em pixels
-FRAME_SKIP  = 2                      # roda YOLO a cada N frames
-FPS_FALLBACK = 30                    # usado se não obtiver FPS do vídeo
+MARGIN      = 3                           # histerese em pixels
+FRAME_SKIP  = 2                           # roda YOLO a cada N frames
+FPS_FALLBACK = 30                         # usado se não obtiver FPS do vídeo
 
 # Inicializa o SORT
 tracker = Sort(max_age=30, min_hits=3, iou_threshold=0.3)
